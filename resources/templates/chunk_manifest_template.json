@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ClassicsChunkManifest",
+  "description": "古籍大文件切片分治治理任务清单模式",
+  "version": "1.0.0",
+  "source_file": "docs/san_ming_tong_hui_raw.md",
+  "created_at": "2026-10-01T00:00:00Z",
+  "total_characters": 185000,
+  "chunk_count": 13,
+  "split_pattern": "^##\\s+(.+)$",
+  "paradigm": "A",
+  "chunks": [
+    {
+      "index": 0,
+      "id": "chunk_00",
+      "title": "前言与总目录",
+      "slice_file": "chunk_00_preamble.md",
+      "cleaned_file": "chunk_00_preamble_clean.md",
+      "char_count": 3200,
+      "fingerprint": "a1b2c3d4e5f67890",
+      "status": "VERIFIED",
+      "verified": true,
+      "similarity": "99.98%"
+    },
+    {
+      "index": 1,
+      "id": "chunk_01",
+      "title": "卷一 原造化之始",
+      "slice_file": "chunk_01_juan1.md",
+      "cleaned_file": null,
+      "char_count": 14200,
+      "fingerprint": "f6e5d4c3b2a10987",
+      "status": "PENDING",
+      "verified": false,
+      "similarity": null
+    }
+  ],
+  "merged_status": "PENDING",
+  "merged_output": null,
+  "global_similarity": null
+}
