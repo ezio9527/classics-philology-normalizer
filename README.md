@@ -112,6 +112,8 @@ classics-philology-normalizer/
 ├── CHANGELOG.md                    # 升级与版本演进日志
 ├── README.md                       # 本工程综合说明文档
 ├── SKILL.md                        # Antigravity 核心技能规约定义文件
+├── references/                     # 权威技术规范与排版白皮书
+│   └── DOCUMENT_FORMAT_SPEC.md     # 🌟 古籍数字化 Markdown 规范格式详细说明书
 ├── resources/
 │   ├── scripts/                    # 纯标准库自动化辅助工具链
 │   │   ├── diff_verifier.py        # 文本指纹与文字保真门禁校验器

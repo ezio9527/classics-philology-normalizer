@@ -312,6 +312,10 @@ sequenceDiagram
 * `resources/templates/bazi_table_template.md`：命造实证四柱排盘与评析规范
 * `resources/templates/chunk_manifest_template.json`：分治切片治理清单元数据模型
 
+### 3. 本地规范文档格式说明书 (`references/`)
+* 权威排版白皮书：[references/DOCUMENT_FORMAT_SPEC.md](./references/DOCUMENT_FORMAT_SPEC.md)
+  系统收录了完整的规范古籍 Markdown 格式标准：涵盖版本考据、全局根 H1、三大古典拓扑深度约束、经文/双行夹注/后世评注/四柱表格/韵文赋文微观语法、空格缩进排版纪律以及端到端黄金示范样例。
+
 ---
 
 ## 触发场景与执行指引 (Triggers)
