@@ -16,6 +16,7 @@ from normalizer_tools import (
     suppress_echoes,
     correct_heading_runaway,
     format_bazi_cases,
+    expand_document_toc,
 )
 
 
@@ -117,6 +118,29 @@ class TestNormalizerTools(unittest.TestCase):
         self.assertIn("| 年柱 | 月柱 | 日柱 | 时柱 |", formatted)
         self.assertIn("| 壬寅 | 丁未 | 己卯 | 乙亥 |", formatted)
         self.assertIn("**评析**：", formatted)
+
+    def test_expand_document_toc(self):
+        """测试根据 Markdown AST 自动提取并扩展多级目录 (H2->H3)"""
+        doc = (
+            "# 《三命通会》\n\n"
+            "## 目录\n"
+            "- [卷一](#卷一)\n\n"
+            "## 卷一\n\n"
+            "### 论五行生成\n"
+            "天一生水。\n\n"
+            "### 论干支源流\n"
+            "夫干者木之干也。\n\n"
+            "## 卷二\n\n"
+            "### 论十干分配天文\n"
+            "甲木为雷。\n"
+        )
+        updated, ok = expand_document_toc(doc, max_depth=3)
+        self.assertTrue(ok)
+        self.assertIn("- [卷一](#卷一)", updated)
+        self.assertIn("  - [论五行生成](#论五行生成)", updated)
+        self.assertIn("  - [论干支源流](#论干支源流)", updated)
+        self.assertIn("- [卷二](#卷二)", updated)
+        self.assertIn("  - [论十干分配天文](#论十干分配天文)", updated)
 
 
 if __name__ == "__main__":

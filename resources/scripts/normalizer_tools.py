@@ -257,6 +257,87 @@ def format_bazi_cases(text: str) -> Tuple[str, int]:
     return "".join(out_lines), count
 
 
+def make_anchor(title: str) -> str:
+    """生成 Markdown 规范锚点"""
+    cleaned = re.sub(r'[\s、，。：:《》【】\[\]()（）/\\!?！？”“\'\"]+', '', title)
+    return cleaned
+
+
+def generate_toc(text: str, max_depth: int = 3) -> str:
+    """
+    扫描 Markdown 文本各级标题，自动生成规范的多级嵌套目录。
+    - 忽略首行 H1 书名与自身 '目录'
+    - 忽略微观元素：【原注】、【任氏曰】、【徐注】等评注标题，以及命例标题
+    - 针对范式 C（纲目矩阵型）：严格截断至 H3 (日主)，绝不将 1440 个时辰全部塞入总目录
+    - 默认生成 H2 及其下属 H3，形成两级至三级导航树
+    """
+    lines = text.splitlines()
+    toc_lines = ["## 目录\n"]
+
+    # 检测是否为范式 C（纲目矩阵型）
+    is_matrix = ("月" in text and "日" in text and "时" in text)
+    if is_matrix:
+        # 强制不超过 3 级（月令 -> 日主），绝不将 1440 个时辰全部塞入总目录
+        max_depth = min(max_depth, 3)
+
+    re_heading = re.compile(r'^(#{2,6})\s+(.*)$')
+    # 评注和命例微观标题正则，不应录入总目录
+    re_skip = re.compile(r'^(?:【(?:原注|任氏曰|徐注|沈注|注|评)】|命例[：:]|命造[：:]|目录)')
+
+    has_entries = False
+    for line in lines:
+        stripped = line.strip()
+        m = re_heading.match(stripped)
+        if m:
+            level = len(m.group(1))
+            title = m.group(2).strip()
+
+            if level > max_depth:
+                continue
+            if re_skip.match(title):
+                continue
+
+            anchor = make_anchor(title)
+            indent = "  " * (level - 2)
+            toc_lines.append(f"{indent}- [{title}](#{anchor})")
+            has_entries = True
+
+    if not has_entries:
+        return ""
+
+    return "\n".join(toc_lines) + "\n"
+
+
+def expand_document_toc(text: str, max_depth: int = 3) -> Tuple[str, bool]:
+    """
+    在文档中更新或注入多级扩展目录。
+    """
+    new_toc = generate_toc(text, max_depth=max_depth)
+    if not new_toc:
+        return text, False
+
+    # 检查是否已有 ## 目录
+    re_old_toc = re.compile(r'##\s+目录[\s\S]*?(?=\n##\s+|\n---\s*\n|\Z)')
+    if re_old_toc.search(text):
+        updated = re_old_toc.sub(new_toc.strip() + "\n", text, count=1)
+        return updated, True
+    else:
+        # 未发现目录，在 H1 及其引言后注入
+        lines = text.splitlines(keepends=True)
+        insert_idx = 0
+        for i, l in enumerate(lines):
+            if l.startswith("# "):
+                insert_idx = i + 1
+                break
+
+        # 跳过 H1 下方紧接着的空行或版本引用块
+        while insert_idx < len(lines) and (lines[insert_idx].startswith(">") or lines[insert_idx].strip() == ""):
+            insert_idx += 1
+
+        lines.insert(insert_idx, f"\n{new_toc}\n---\n\n")
+        return "".join(lines), True
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="古籍文献体例规范化与校勘辅助工具箱"
@@ -281,6 +362,12 @@ def main():
     p_bazi = subparsers.add_parser("format-bazi", help="将干支四柱规范化为标准 Markdown 表格排盘")
     p_bazi.add_argument("-i", "--input", required=True, help="输入 Markdown 文件路径")
     p_bazi.add_argument("-o", "--output", required=True, help="输出 Markdown 文件路径")
+
+    # expand-toc
+    p_toc = subparsers.add_parser("expand-toc", help="自动提取并扩展多级层级目录 (卷->篇/章)")
+    p_toc.add_argument("-i", "--input", required=True, help="输入 Markdown 文件路径")
+    p_toc.add_argument("-o", "--output", required=True, help="输出 Markdown 文件路径")
+    p_toc.add_argument("-d", "--depth", type=int, default=3, help="目录展开最大层级（默认 3，即展开至 H3 篇章/日主）")
 
     args = parser.parse_args()
 
@@ -331,6 +418,17 @@ def main():
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(cleaned)
         print(f"✅ 成功格式化 {count} 处命例八字排盘表格。已保存至: {output_path}")
+
+    elif args.command == "expand-toc":
+        cleaned, ok = expand_document_toc(content, max_depth=args.depth)
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(cleaned)
+        if ok:
+            print(f"✅ 成功提取并生成多级目录（最大深度 H{args.depth}）。已保存至: {output_path}")
+        else:
+            print(f"ℹ️ 未检测到有效章节标题，未更新目录。已复制至: {output_path}")
 
 
 if __name__ == "__main__":

@@ -127,9 +127,13 @@ flowchart LR
 1. **全局根节点 (H1)**：
    * 全篇有且仅有第 1 行出现 1 次一级标题：`# 《书名》`。
    * 严禁在正文中重复出现 `#` 标题。
-2. **规范化目录**：
-   * 卷首如有目录，统一使用 `## 目录`。
-   * 采用标准 Markdown 链接列表，对齐校勘后的最新标题层级。
+2. **规范化多级目录与扩展 (Multi-level TOC Expansion)**：
+   * 卷首目录统一命名为 `## 目录`；
+   * **多级扩展原则**：若原始目录仅有二级大纲（如仅列卷名），**必须对目录进行多级扩展**，深入提取正文的篇/章论题构建多级超链接树；
+   * **深度控制红线**：
+     - 范式 A（汇编全书型）与 范式 B（主干经注型）：展开至 **H2 卷/篇 $\to$ H3 篇章**（禁止展开细碎赋文、评注与命例）；
+     - 范式 C（纲目矩阵型）：**严格截止至 H3 日主目**（绝对禁止将 1440 个 H4 时辰条目全量塞入总目录造成行数爆炸）；
+   * 可直接调用 `normalizer_tools.py expand-toc` 自动重构；`diff_verifier.py` 会自动将目录块与正文字数解耦对比。
 3. **消除标题机械回声 (Echo Suppression)**：
    * 彻底清除网络采集与排版重叠产生的无意义重复标题，例如：
      ```markdown
@@ -303,6 +307,9 @@ sequenceDiagram
 
   # 自动将命例八字排盘转换为标准四柱表格
   python3 resources/scripts/normalizer_tools.py format-bazi -i raw_book.md -o formatted.md
+
+  # 依据正文 AST 自动提取并扩展多级嵌套目录 (默认展开至 H3 篇章/日主)
+  python3 resources/scripts/normalizer_tools.py expand-toc -i raw_book.md -o with_toc.md -d 3
   ```
 
 ### 2. 标准化体例模板 (`resources/templates/`)
