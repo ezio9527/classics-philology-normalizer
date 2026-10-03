@@ -279,3 +279,71 @@
 
 地道虽静，其机常动。五行之气，在天为风热湿燥寒，在地为木火土金水。顺天地之流行，方明休咎之精微。
 ```
+
+---
+
+## 8. 面向 SEO 静态站的原子化章节拆分与 Frontmatter 规约
+
+### 8.1 为什么必须对单体古籍进行 SEO 原子化切分？
+单体古籍文档（动辄 3~30 万字）直接发布于现代静态站点（Astro, Hugo, Next.js, VitePress）存在以下致命缺陷：
+1. **搜索关键词稀释（Thin Keyword Match）**：读者检索“论五行生成”时，整书单页标题只能匹配书名，难以在 SERP（搜索引擎结果页）取得高排名；
+2. **首屏性能劣化（LCP 恶化）**：超长页面产生上万 DOM 节点，大幅降低页面加载速度；
+3. **缺乏深层内链拓扑**：单页无法形成“上一篇/下一篇/分卷聚合/面包屑”的紧密内链网，爬虫抓取深度严重受限。
+
+因此，**将规范化单体古籍按“黄金原子单元”拆解为静态站独立文章页，是实现古籍互联网高权重传播的必由之路**。
+
+### 8.2 三大编纂范式的切分粒度标准
+* **范式 A【汇编全书型】（切至 H3 篇章）**：
+  每个篇章（如《论五行生成》）独立为一页（800~3000 字），H2 卷为分卷聚合页。
+* **范式 B【主干经注型】（切至 H3 核心论章）**：
+  每个论章（如《天道》）独立为一页（1000~4000 字），包含经文、双行原注、任氏阐微与数例命造，内容丰满。
+* **范式 C【纲目矩阵型】（切至 H3 日主目，包裹 12 时辰）**：
+  **核心 SEO 门禁**：每个日主（如《寅月·甲日》）独立为一页（约 1500 字），内含该日主的 12 个时辰断语。**严禁拆分为 1440 个时辰微页面**，避免因页面字数过少被判定为“薄内容（Thin Content）”遭到降权。
+
+### 8.3 目标静态站目录组织拓扑
+```text
+dist_seo/
+└── {book_slug}/
+    ├── index.md                      # 全书总览页 (Book Hub): 版本考据 + 全书总目
+    ├── site_manifest.json            # 站点全量元数据清单
+    ├── {volume_slug}/
+    │   ├── index.md                  # 分卷聚合页 (Volume Hub): 卷导读 + 篇目链接
+    │   ├── 01_{chapter_slug}.md      # 原子文章内容页: 带 Frontmatter + 纯正文
+    │   ├── 02_{chapter_slug}.md
+    │   └── ...
+    └── ...
+```
+
+### 8.4 原子章节标准 YAML Frontmatter 规约
+```yaml
+---
+title: "论五行生成 - 《三命通会》卷一"
+description: "五行者，往来乎天地之间而穷历四时者也。天一生水，地六成之；地二生火，天七成之……"
+book: "三命通会"
+book_slug: "san-ming-tong-hui"
+volume: "卷一"
+volume_slug: "juan-01"
+chapter: "论五行生成"
+chapter_slug: "lun-wu-xing-sheng-cheng"
+canonical_url: "/classics/san-ming-tong-hui/juan-01/01_lun-wu-xing-sheng-cheng"
+keywords: ["三命通会", "卷一", "论五行生成", "天一生水", "五行生成", "八字命理"]
+word_count: 1420
+order: 1
+prev:
+  title: "原造化之始"
+  url: "/classics/san-ming-tong-hui/juan-01/00_yuan-zao-hua-zhi-shi"
+next:
+  title: "论干支源流"
+  url: "/classics/san-ming-tong-hui/juan-01/02_lun-gan-zhi-yuan-liu"
+---
+```
+
+### 8.5 自动化命令行生成
+```bash
+# 一键完成古籍的 SEO 静态站原子化拆解
+python3 resources/scripts/normalizer_tools.py seo-split \
+  -i classics_golden/san_ming_tong_hui.md \
+  -o dist_seo/ \
+  --base-url "/classics"
+```
+

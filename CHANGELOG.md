@@ -5,6 +5,24 @@ All notable changes to `classics-philology-normalizer` will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-10-03
+
+### Added
+- **SEO Static Site Chapter Atomization Pipeline (Step 5)**:
+  - Added `resources/scripts/seo_splitter.py` for transforming monolithic classical texts into rich static-site-ready Markdown chapters.
+  - Generates full SEO YAML Frontmatter (`title`, `description`, `canonical_url`, `keywords`, `prev`, `next`, `order`, `breadcrumbs`).
+  - Creates Book Landing Hubs (`index.md`) and Volume Hubs (`volume/index.md`) for internal linking clusters.
+  - Implements Paradigm C matrix aggregation: aggregates H4 hour branches under H3 Day Master page to avoid thin content penalties.
+  - Outputs `site_manifest.json` catalog of all pages and URLs.
+  - Added `resources/templates/seo_page_template.md` standard page template.
+  - Added CLI command `normalizer_tools.py seo-split`.
+- **Multi-Level TOC Expansion Engine**:
+  - Added `expand-toc` command in `normalizer_tools.py` for auto-generating multi-level nested TOCs.
+  - Defined TOC depth principles across Paradigms A, B, and C in `references/DOCUMENT_FORMAT_SPEC.md §2.2`.
+  - Decoupled `## 目录` block in `diff_verifier.py` to prevent TOC expansions from altering text invariance scores.
+- **Automated Test Suite**:
+  - Added unit test suite `tests/test_seo_splitter.py` covering pinyin slugs, chapter splitting, hub page generation, prev/next links, and matrix aggregation. Total 16 unit tests passing.
+
 ## [1.0.0] - 2026-10-01
 
 ### Added

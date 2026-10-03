@@ -101,6 +101,7 @@ flowchart TD
 | **`chunk_splitter.py`** | 大部头 Markdown 按卷切片引擎 | `python3 resources/scripts/chunk_splitter.py -i book.md -o temp/chunks/ -m 30000` |
 | **`chunk_merger.py`** | 拓扑切片装配与全书终审比对 | `python3 resources/scripts/chunk_merger.py -m temp/chunks/manifest.json -o final.md` |
 | **`normalizer_tools.py`** | 范式判定、回声消除、八字排盘辅助 | `python3 resources/scripts/normalizer_tools.py detect-paradigm -i book.md` |
+| **`seo_splitter.py`** | 静态站 SEO 原子化章节拆解与内链引擎 | `python3 resources/scripts/seo_splitter.py -i book.md -o dist_seo/` |
 
 ---
 
@@ -119,18 +120,21 @@ classics-philology-normalizer/
 │   │   ├── diff_verifier.py        # 文本指纹与文字保真门禁校验器
 │   │   ├── chunk_splitter.py       # 大部头切片分治引擎
 │   │   ├── chunk_merger.py         # 拓扑装配与终审合并器
-│   │   └── normalizer_tools.py     # 范式识别/降噪/回声消除/排盘工具
+│   │   ├── normalizer_tools.py     # 范式识别/降噪/回声消除/排盘工具
+│   │   └── seo_splitter.py         # 🌟 SEO 静态站原子化章节拆解引擎
 │   └── templates/                  # 典籍编纂三大范式与排盘模板
 │       ├── paradigm_A_template.md  # 范式 A: 汇编全书型骨架模板
 │       ├── paradigm_B_template.md  # 范式 B: 主干经注型骨架模板
 │       ├── paradigm_C_template.md  # 范式 C: 纲目矩阵型骨架模板
 │       ├── bazi_table_template.md  # 八字命造实证排盘规范模板
-│       └── chunk_manifest_template.json # 切片分治清单元数据模型
+│       ├── chunk_manifest_template.json # 切片分治清单元数据模型
+│       └── seo_page_template.md    # 🌟 标准 SEO 单页与 Frontmatter 模板
 └── tests/                          # 自动化单元测试套件 (100% 覆盖通过)
     ├── __init__.py
     ├── test_diff_verifier.py
     ├── test_chunk_lifecycle.py
-    └── test_normalizer_tools.py
+    ├── test_normalizer_tools.py
+    └── test_seo_splitter.py
 ```
 
 ---

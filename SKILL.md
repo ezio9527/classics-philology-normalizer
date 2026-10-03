@@ -247,6 +247,34 @@ sequenceDiagram
 
 ---
 
+### 第五步：面向 SEO 静态站的原子化章节拆分流水线 (SEO Atomization Pipeline)
+
+当古籍治理为黄金标准单体文档后，若直接部署到现代静态站点（Astro, Hugo, Next.js, VitePress）会导致页面超重、DOM 膨胀与长尾搜索匹配弱等 SEO 缺陷。因此提供原子化拆解流水线：
+
+```mermaid
+graph LR
+    Master["黄金单体古籍 Markdown"] --> SEOSplit["seo_splitter.py 拆分引擎"]
+    SEOSplit --> Hub1["book/index.md (全书总览落地页)"]
+    SEOSplit --> Hub2["book/volume/index.md (分卷聚合页)"]
+    SEOSplit --> Leaf["book/volume/XX_chapter.md (原子叶子文章页)"]
+    SEOSplit --> Map["site_manifest.json (全站元数据清单)"]
+```
+
+#### 执行规约：
+1. **粒度控制**：
+   * 范式 A（汇编全书型）与 范式 B（主干经注型）：拆分至 **H3 篇/章** 为独立内容页（800~3000 字最佳 SEO 篇幅）；
+   * 范式 C（纲目矩阵型）：**聚合至 H3 日主目**为独立页（内含 12 时辰），**严禁拆分为 1440 个极短页面**，避免触犯搜索引擎“薄内容（Thin Content）”惩罚；
+2. **SEO Frontmatter 注入**：自动为各原子叶子页生成包含 `title`, `description`, `canonical_url`, `keywords`, `prev`, `next`, `order` 的丰富 YAML 前言；
+3. **双向翻页内链集群**：自动计算同卷及跨卷的“上一篇 / 卷目录 / 下一篇”双向链轮与顶部面包屑导航；
+4. **命令行调用**：
+   ```bash
+   python3 resources/scripts/seo_splitter.py -i golden_book.md -o dist_seo/ --base-url "/classics"
+   # 或
+   python3 resources/scripts/normalizer_tools.py seo-split -i golden_book.md -o dist_seo/
+   ```
+
+---
+
 ## 质量红线与十大反模式 (Anti-Patterns Checklist)
 
 | 序号 | 常见反模式 (Pitfall) | 铁律约束与正确做法 (Correct Standard) |

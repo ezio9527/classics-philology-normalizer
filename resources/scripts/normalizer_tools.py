@@ -369,6 +369,13 @@ def main():
     p_toc.add_argument("-o", "--output", required=True, help="输出 Markdown 文件路径")
     p_toc.add_argument("-d", "--depth", type=int, default=3, help="目录展开最大层级（默认 3，即展开至 H3 篇章/日主）")
 
+    # seo-split
+    p_seo = subparsers.add_parser("seo-split", help="将规范古籍原子化拆解为带 SEO Frontmatter 的静态站 Markdown 章节集群")
+    p_seo.add_argument("-i", "--input", required=True, help="输入规范化 Markdown 文件路径")
+    p_seo.add_argument("-o", "--output-dir", default="dist_seo", help="静态站切片输出根目录（默认 dist_seo）")
+    p_seo.add_argument("-b", "--base-url", default="/classics", help="站内根路由前缀（默认 /classics）")
+    p_seo.add_argument("-l", "--level", type=int, default=3, help="切分目标层级（默认 3）")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -429,6 +436,31 @@ def main():
             print(f"✅ 成功提取并生成多级目录（最大深度 H{args.depth}）。已保存至: {output_path}")
         else:
             print(f"ℹ️ 未检测到有效章节标题，未更新目录。已复制至: {output_path}")
+
+    elif args.command == "seo-split":
+        try:
+            from seo_splitter import SEOSplitter
+        except ImportError:
+            sys.path.append(str(Path(__file__).parent))
+            from seo_splitter import SEOSplitter
+
+        splitter = SEOSplitter(
+            input_file=input_path,
+            output_dir=Path(args.output_dir),
+            base_url=args.base_url,
+            split_level=args.level
+        )
+        res = splitter.split_and_generate()
+        print("=" * 65)
+        print("🚀 古籍 SEO 原子化章节拆分成功 (SEO Chapter Atomization Done)")
+        print("=" * 65)
+        print(f"典籍名称: 《{res['book_title']}》")
+        print(f"输出目录: {res['output_directory']}")
+        print(f"生成分卷: {res['total_volumes']} 卷/篇")
+        print(f"生成原子文章: {res['total_chapters']} 篇")
+        print(f"静态文件总数: {res['generated_files_count']} 个")
+        print(f"结构清单: {res['manifest_file']}")
+        print("=" * 65)
 
 
 if __name__ == "__main__":
