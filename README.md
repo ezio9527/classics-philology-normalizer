@@ -93,15 +93,15 @@ flowchart TD
 
 ## 🛠️ 内置工具套件 (Resources & Scripts)
 
-本 Skill 内置无外部依赖的标准 Python 工具链（位于 `resources/scripts/`）：
+本 Skill 内置无外部依赖的标准 Python 工具链（位于 `resources/scripts/`）。在跨项目引入时，直接通过 `<SKILL_DIR>` 调用，**严禁在宿主项目中自制临时脚本**：
 
-| 脚本工具 | 功能描述 | 核心命令示例 |
+| 脚本工具 | 功能描述 | 核心命令示例（跨项目时替换 `<SKILL_DIR>`） |
 | :--- | :--- | :--- |
-| **`diff_verifier.py`** | 纯文本指纹比对门禁（$\ge 99.8\%$） | `python3 resources/scripts/diff_verifier.py -o raw.md -c clean.md` |
-| **`chunk_splitter.py`** | 大部头 Markdown 按卷切片引擎 | `python3 resources/scripts/chunk_splitter.py -i book.md -o temp/chunks/ -m 30000` |
-| **`chunk_merger.py`** | 拓扑切片装配与全书终审比对 | `python3 resources/scripts/chunk_merger.py -m temp/chunks/manifest.json -o final.md` |
-| **`normalizer_tools.py`** | 范式判定、回声消除、八字排盘辅助 | `python3 resources/scripts/normalizer_tools.py detect-paradigm -i book.md` |
-| **`seo_splitter.py`** | 静态站 SEO 原子化章节拆解与内链引擎 | `python3 resources/scripts/seo_splitter.py -i book.md -o dist_seo/` |
+| **`diff_verifier.py`** | 纯文本指纹比对门禁（$\ge 99.8\%$） | `python3 <SKILL_DIR>/resources/scripts/diff_verifier.py -o raw.md -c clean.md` |
+| **`chunk_splitter.py`** | 大部头 Markdown 按卷切片引擎 | `python3 <SKILL_DIR>/resources/scripts/chunk_splitter.py -i book.md -o temp/chunks/ -m 30000` |
+| **`chunk_merger.py`** | 拓扑切片装配与全书终审比对 | `python3 <SKILL_DIR>/resources/scripts/chunk_merger.py -m temp/chunks/manifest.json -o final.md` |
+| **`normalizer_tools.py`** | 范式判定、回声消除、八字排盘辅助 | `python3 <SKILL_DIR>/resources/scripts/normalizer_tools.py detect-paradigm -i book.md` |
+| **`seo_splitter.py`** | 静态站 SEO 原子化章节拆解与内链引擎 | `python3 <SKILL_DIR>/resources/scripts/seo_splitter.py -i book.md -o dist_seo/` |
 
 ---
 

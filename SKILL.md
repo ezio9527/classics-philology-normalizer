@@ -147,15 +147,13 @@ flowchart LR
      五行者，往来乎天地之间……
      ```
 4. **纠正标题越位与降级错误 (Runaway Headings)**：
-   * **严禁将长篇正文整段挂在标题后**：
+   * **严禁将长篇正文整段挂在标题后，评注统一收敛为引用块**：
      ```markdown
      <!-- 错误示范：标题内嵌入长篇正文 -->
      ### 【徐注】阴阳之说，最为深奥，若非熟读阴阳五行生克制化，未易窥其门径……
 
-     <!-- 治理后规范：标题规范化，正文独立成段 -->
-     #### 【徐注】
-
-     阴阳之说，最为深奥，若非熟读阴阳五行生克制化，未易窥其门径……
+     <!-- 治理后规范：转换为标准引用块评注，彻底去除 H4 目录污染与 SEO 权重稀释 -->
+     > **【徐注】**：阴阳之说，最为深奥，若非熟读阴阳五行生克制化，未易窥其门径……
      ```
    * **补齐缺失的宏观容器**：
      若原始文本中卷一的所有篇目散落（如直接出现 `### 论五行生成`），必须在篇目集合之前补齐 `## 卷一`，保证标题树的逻辑连续性。
@@ -172,11 +170,9 @@ flowchart LR
   ```markdown
   > **【原注】**：天有阴阳，地有刚柔，人道得之，以理气相顺而成天地之造化也。
   ```
-* **后世名家评注（任铁樵、徐乐吾、沈孝瞻等）**：统一规范为四级标题，后接自然段：
+* **后世名家评注（任铁樵、徐乐吾、沈孝瞻等）**：统一转换为 Markdown 引用块（`> **【某某注】**：` 或 `> **某某注**：`），彻底避免目录大纲臃肿与 SEO 权重稀释：
   ```markdown
-  #### 【任氏曰】
-
-  帝载神功，即阴阳造化之妙也。生生不息，变化无穷……
+  > **【任氏曰】**：帝载神功，即阴阳造化之妙也。生生不息，变化无穷……
   ```
 
 #### 2. 八字命造实证排盘规范
@@ -267,14 +263,14 @@ graph LR
 3. **双向翻页内链集群**：自动计算同卷及跨卷的“上一篇 / 卷目录 / 下一篇”双向链轮与顶部面包屑导航；
 4. **命令行调用**：
    ```bash
-   python3 resources/scripts/seo_splitter.py -i golden_book.md -o dist_seo/ --base-url "/classics"
+   python3 <SKILL_DIR>/resources/scripts/seo_splitter.py -i golden_book.md -o dist_seo/ --base-url "/classics"
    # 或
-   python3 resources/scripts/normalizer_tools.py seo-split -i golden_book.md -o dist_seo/
+   python3 <SKILL_DIR>/resources/scripts/normalizer_tools.py seo-split -i golden_book.md -o dist_seo/
    ```
 
 ---
 
-## 质量红线与十大反模式 (Anti-Patterns Checklist)
+## 质量红线与十一大约束反模式 (Anti-Patterns Checklist)
 
 | 序号 | 常见反模式 (Pitfall) | 铁律约束与正确做法 (Correct Standard) |
 | :--- | :--- | :--- |
@@ -282,12 +278,13 @@ graph LR
 | **2** | **主观擅自“改错字”**：遇到通假字或生僻字擅自替换 | **文献学原则**：版本底本优先，严禁擅改异体字、古通假字或原作者笔误 |
 | **3** | **时辰条目不拆解**：直接写 `### 寅月甲日甲子时` | **范式 C 规范**：必须拆分为 `## 寅月` $\to$ `### 甲日` $\to$ `#### 甲子时` |
 | **4** | **单次 Prompt 吞吐大部头**：尝试一次性处理数万字原著 | **分治铁律**：超 3 万字必须使用 `chunk_splitter.py` 切片分治推进 |
-| **5** | **长段正文嵌入标题**：在 `### 【徐注】` 后粘贴大段正文 | **AST 规范**：标题仅保留称谓 `#### 【徐注】`，正文另起独立自然段 |
+| **5** | **长段正文嵌入标题或滥用评注小标题**：把评注写为 `### 【徐注】正文...` 或滥用 H4 | **评注收敛**：统一收敛为引用块 `> **【徐注】**：...`，杜绝 H4 目录污染与 SEO 权重稀释 |
 | **6** | **机械标题回声残留**：`## 论五行` 紧跟 `### 论五行` | **降噪规范**：彻底消除网络采集造成的重复同名子标题 |
 | **7** | **命造八字混在散文中**：八字干支与评语揉成一团 | **排盘规范**：必须转换为 `##### 命例：...` 与四柱 Markdown 表格 |
 | **8** | **韵文歌赋与散文混排**：口诀赋文混杂在段落中 | **排版规范**：韵文歌赋一律使用 Markdown 引用块（`> `）保持断句与对仗 |
 | **9** | **多处一级标题**：文中散落多个 `#` 标题 | **全局 H1 规范**：全篇有且仅有首行出现 1 次 `# 《书名》` |
 | **10** | **跳过保真度校验**：处理完直接交工，未运行校验工具 | **门禁守门**：合并前后必须执行 `diff_verifier.py`，相似度低于 99.8% 严禁放行 |
+| **11** | **跨项目引入时擅自重写 Python 辅助脚本**：在宿主工程中用 `write_to_file` 新建临时脚本（如 `clean.py` 等） | **工程铁律**：严禁在宿主工程自制脚本！必须通过 `<SKILL_DIR>` 绝对路径调用本 Skill 内置只读工具链 |
 
 ---
 
@@ -295,51 +292,65 @@ graph LR
 
 在技能仓库的 `resources/` 目录下配有标准化交付模板与辅助 CLI 工具：
 
+### 0. 跨项目调用规约与零代码污染原则 (Cross-Project Execution & Anti-Pollution Rule)
+
+> [!CAUTION]
+> **严禁在被治理的目标项目中重复编写、生成或复制任何 Python 工具代码！**
+> 
+> 本 Skill 自带经过完备单元测试验证的只读通用工具链（位于 Skill 所在根目录下的 `resources/scripts/`），具备纯标准库、零外部依赖特性。当你在其他古籍工程目录中使用本 Skill 时：
+> 1. **严禁在目标工作区创建临时代码**：禁止在目标项目根目录下创建诸如 `clean_text.py`, `verify.py`, `format_bazi.py`, `splitter.py` 等临时脚本，避免对宿主项目造成代码污染。
+> 2. **必须使用 Skill 绝对路径执行内置脚本**：Agent 必须在系统提示词的 `Available skills` 列表中解析出本 Skill（`classics-philology-normalizer`）的实际安装根目录 `<SKILL_DIR>`（例如 `/Users/.../.gemini/antigravity/skills/classics-philology-normalizer` 或实际存放路径），通过绝对路径直接运行脚本。
+> 3. **统一调用命令模板**：
+>    ```bash
+>    python3 <SKILL_DIR>/resources/scripts/<script_name>.py [参数...]
+>    ```
+>    *（注：若当前工作空间恰好就是本 Skill 仓库本身，`<SKILL_DIR>` 可简化为 `.`）*
+
 ### 1. 命令行辅助脚本 (`resources/scripts/`)
 
 * **古籍文本保真度门禁校验器 (`diff_verifier.py`)**：
   ```bash
   # 校验单切片或全书清洗前后纯文本相似度（门禁 >= 99.8%）
-  python3 resources/scripts/diff_verifier.py -o raw_book.md -c normalized_book.md
+  python3 <SKILL_DIR>/resources/scripts/diff_verifier.py -o raw_book.md -c normalized_book.md
 
   # 以 JSON 格式输出差异明细
-  python3 resources/scripts/diff_verifier.py -o raw_slice.md -c clean_slice.md --json
+  python3 <SKILL_DIR>/resources/scripts/diff_verifier.py -o raw_slice.md -c clean_slice.md --json
   ```
 
 * **大部头古籍切片分治工具 (`chunk_splitter.py`)**：
   ```bash
   # 将大部头古籍按卷/篇切片至 temp/chunks/，生成 manifest.json
-  python3 resources/scripts/chunk_splitter.py -i raw_large_book.md -o temp/chunks/ -m 30000
+  python3 <SKILL_DIR>/resources/scripts/chunk_splitter.py -i raw_large_book.md -o temp/chunks/ -m 30000
 
   # 强制切片（无论是否满 3 万字）
-  python3 resources/scripts/chunk_splitter.py -i raw_book.md -o temp/chunks/ --force
+  python3 <SKILL_DIR>/resources/scripts/chunk_splitter.py -i raw_book.md -o temp/chunks/ --force
   ```
 
 * **拓扑装配与终审合并工具 (`chunk_merger.py`)**：
   ```bash
   # 按清单装配已清洗切片，并自动执行全书文字保真终审比对
-  python3 resources/scripts/chunk_merger.py -m temp/chunks/manifest.json -o final_golden_book.md
+  python3 <SKILL_DIR>/resources/scripts/chunk_merger.py -m temp/chunks/manifest.json -o final_golden_book.md
   ```
 
 * **体例治理与特征识别辅助工具 (`normalizer_tools.py`)**：
   ```bash
   # 自动检测典籍编纂范式 (纯 AST 拓扑结构判定，零硬编码；支持可选 -c 指定配置)
-  python3 resources/scripts/normalizer_tools.py detect-paradigm -i raw_book.md [-c classics_config.json]
+  python3 <SKILL_DIR>/resources/scripts/normalizer_tools.py detect-paradigm -i raw_book.md [-c classics_config.json]
 
   # 自动清理机械标题回声
-  python3 resources/scripts/normalizer_tools.py suppress-echoes -i raw_book.md -o no_echo.md
+  python3 <SKILL_DIR>/resources/scripts/normalizer_tools.py suppress-echoes -i raw_book.md -o no_echo.md
 
   # 自动清理爬虫残留与无用页面标记
-  python3 resources/scripts/normalizer_tools.py clean-crawler-noise -i raw_book.md -o no_crawler.md
+  python3 <SKILL_DIR>/resources/scripts/normalizer_tools.py clean-crawler-noise -i raw_book.md -o no_crawler.md
 
   # 自动将命例八字排盘转换为标准四柱表格（涵盖乾造、坤造、某尚书造、岳武穆命等通用前缀）
-  python3 resources/scripts/normalizer_tools.py format-bazi -i raw_book.md -o formatted.md
+  python3 <SKILL_DIR>/resources/scripts/normalizer_tools.py format-bazi -i raw_book.md -o formatted.md
 
   # 依据正文 AST 自动提取并扩展多级嵌套目录 (默认展开至 H3 篇章/日主)
-  python3 resources/scripts/normalizer_tools.py expand-toc -i raw_book.md -o with_toc.md -d 3
+  python3 <SKILL_DIR>/resources/scripts/normalizer_tools.py expand-toc -i raw_book.md -o with_toc.md -d 3
 
   # SEO 静态站原子化章节拆分引擎
-  python3 resources/scripts/normalizer_tools.py seo-split -i golden_book.md -o dist_seo/ -b /classics
+  python3 <SKILL_DIR>/resources/scripts/normalizer_tools.py seo-split -i golden_book.md -o dist_seo/ -b /classics
   ```
 
 * **零依赖拼音与数字转换引擎 (`pinyin_dict.py`)**：

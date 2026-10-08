@@ -86,7 +86,7 @@
 ```
 
 #### 2.2.4 自动化生成与文字保真门禁解耦
-* **自动化生成**：可直接调用 `python3 resources/scripts/normalizer_tools.py expand-toc -i book.md -o book.md -d 3` 依据正文 AST 树一键重构并更新多级目录；
+* **自动化生成**：可直接调用 `python3 <SKILL_DIR>/resources/scripts/normalizer_tools.py expand-toc -i book.md -o book.md -d 3` 依据正文 AST 树一键重构并更新多级目录；
 * **门禁解耦**：`diff_verifier.py` 在计算文字保真度时，会自动识别并剥离 `## 目录` 导航元数据块，因此**目录多级扩展不会误触发古籍正文字数漂移警报**。
 
 ---
@@ -339,7 +339,7 @@ next:
 ### 8.5 自动化命令行生成
 ```bash
 # 一键完成古籍的 SEO 静态站原子化拆解
-python3 resources/scripts/normalizer_tools.py seo-split \
+python3 <SKILL_DIR>/resources/scripts/normalizer_tools.py seo-split \
   -i classics_golden/san_ming_tong_hui.md \
   -o dist_seo/ \
   --base-url "/classics"
