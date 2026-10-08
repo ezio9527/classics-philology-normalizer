@@ -101,8 +101,10 @@ def strip_markdown(text: str) -> str:
                 continue
             prev_heading = norm_head
 
-            # 移除命例标题结构前缀 如 ##### 命例： 或 ##### 命造：
-            curr_heading = re.sub(r'^(?:命例|命造|案例|案谱)[：:]\s*', '', curr_heading)
+            # 移除命例标题结构前缀 如 ##### 命例：
+            curr_heading = re.sub(r'^(?:命例|案例)[：:]\s*', '', curr_heading)
+            # 移除外层方头括号【】（名家评注标题语法标记）
+            curr_heading = re.sub(r'^[【\[](.*?)[】\]]$', r'\1', curr_heading)
             # 移除书名号《》若其仅包裹在H1书名处
             if level == '#':
                 curr_heading = re.sub(r'^[《〈](.*?)[》〉]$', r'\1', curr_heading)
@@ -150,6 +152,59 @@ def normalize_ancient_text(text: str, is_original: bool = False) -> str:
     return pure_chars
 
 
+def fast_diff_match(a: str, b: str, min_anchor: int = 40) -> Tuple[int, List[Tuple[str, str, str]]]:
+    """
+    分治快速对比大规模古籍文本（O(N log N)），兼顾吞吐量与精细差异提取。
+    """
+    if a == b:
+        return len(a), []
+
+    p = 0
+    max_p = min(len(a), len(b))
+    while p < max_p and a[p] == b[p]:
+        p += 1
+
+    s = 0
+    max_s = min(len(a) - p, len(b) - p)
+    while s < max_s and a[len(a) - 1 - s] == b[len(b) - 1 - s]:
+        s += 1
+
+    sub_a = a[p:len(a) - s] if s else a[p:]
+    sub_b = b[p:len(b) - s] if s else b[p:]
+
+    if not sub_a or not sub_b:
+        tag = 'delete' if sub_a else 'insert'
+        return p + s, [(tag, sub_a, sub_b)]
+
+    if len(sub_a) <= 5000 and len(sub_b) <= 5000:
+        sm = difflib.SequenceMatcher(None, sub_a, sub_b, autojunk=False)
+        diffs = []
+        for tag, i1, i2, j1, j2 in sm.get_opcodes():
+            if tag != 'equal':
+                diffs.append((tag, sub_a[i1:i2], sub_b[j1:j2]))
+        return p + s + sum(m.size for m in sm.get_matching_blocks()), diffs
+
+    mid = len(sub_a) // 2
+    anchor = sub_a[mid:mid + min_anchor]
+    search_start = max(0, mid - 2000)
+    search_end = min(len(sub_b), mid + 2000)
+    idx = sub_b.find(anchor, search_start, search_end)
+    if idx == -1:
+        idx = sub_b.find(anchor)
+
+    if idx != -1:
+        m_left, d_left = fast_diff_match(sub_a[:mid], sub_b[:idx], min_anchor)
+        m_right, d_right = fast_diff_match(sub_a[mid + min_anchor:], sub_b[idx + min_anchor:], min_anchor)
+        return p + s + m_left + min_anchor + m_right, d_left + d_right
+    else:
+        sm = difflib.SequenceMatcher(None, sub_a, sub_b, autojunk=False)
+        diffs = []
+        for tag, i1, i2, j1, j2 in sm.get_opcodes():
+            if tag != 'equal':
+                diffs.append((tag, sub_a[i1:i2], sub_b[j1:j2]))
+        return p + s + sum(m.size for m in sm.get_matching_blocks()), diffs
+
+
 def verify_text_invariance(
     original_text: str,
     cleaned_text: str,
@@ -176,34 +231,32 @@ def verify_text_invariance(
             "diff_summary": "原始文档提取纯文本为空"
         }
 
-    # 快速路径：若文本完全一致，直接通过，避免超长古籍执行二次方复杂度的 SequenceMatcher
     if norm_orig == norm_clean:
-        similarity = 1.0
-        matcher = None
-    else:
-        # 使用 SequenceMatcher 计算相似度
-        matcher = difflib.SequenceMatcher(None, norm_orig, norm_clean, autojunk=False)
-        similarity = matcher.ratio()
+        return {
+            "passed": True,
+            "similarity": 1.0,
+            "similarity_pct": "100.000%",
+            "threshold_pct": f"{threshold * 100:.3f}%",
+            "original_char_count": len_orig,
+            "cleaned_char_count": len_clean,
+            "char_difference": 0,
+            "sample_diffs": []
+        }
 
+    matched_chars, raw_diffs = fast_diff_match(norm_orig, norm_clean)
+    similarity = (2.0 * matched_chars) / (len_orig + len_clean)
     diff_chars = abs(len_orig - len_clean)
     passed = similarity >= threshold
 
-    # 提取差异明细
     diff_snippets: List[str] = []
     if not passed or similarity < 1.0:
-        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        for tag, o_str, c_str in raw_diffs:
             if tag == 'replace':
-                diff_snippets.append(
-                    f"【文字变异/篡改】 原文[{i1}:{i2}]: '{norm_orig[i1:i2]}' -> 清洗后[{j1}:{j2}]: '{norm_clean[j1:j2]}'"
-                )
+                diff_snippets.append(f"【文字变异/篡改】 原文: '{o_str[:50]}' -> 清洗后: '{c_str[:50]}'")
             elif tag == 'delete':
-                diff_snippets.append(
-                    f"【文字缺失/擅删】 原文[{i1}:{i2}]: '{norm_orig[i1:i2]}'"
-                )
+                diff_snippets.append(f"【文字缺失/擅删】 原文: '{o_str[:50]}'")
             elif tag == 'insert':
-                diff_snippets.append(
-                    f"【非法多余字符】 清洗后[{j1}:{j2}]: '{norm_clean[j1:j2]}'"
-                )
+                diff_snippets.append(f"【非法多余字符】 清洗后: '{c_str[:50]}'")
             if len(diff_snippets) >= 20:
                 diff_snippets.append("... 差异过多，仅展示前 20 处 ...")
                 break
@@ -228,7 +281,7 @@ def main():
     parser.add_argument("-c", "--cleaned", required=True, help="清洗规范化后 Markdown 文件路径")
     parser.add_argument(
         "-t", "--threshold", type=float, default=0.998,
-        help="纯文本保真度门禁阈值（默认 0.998 即 99.8%）"
+        help="纯文本保真度门禁阈值（默认 0.998 即 99.8%%）"
     )
     parser.add_argument("--json", action="store_true", help="以 JSON 格式输出检测报告")
     parser.add_argument("-v", "--verbose", action="store_true", help="输出完整变动明细")

@@ -187,36 +187,77 @@ def suppress_echoes(text: str) -> Tuple[str, int]:
     return "".join(out_lines), echo_count
 
 
+def normalize_commentary_tag(raw: str) -> str:
+    """标准化评注者标签格式为【某某注/曰】"""
+    cleaned = re.sub(r'[「」\[\]【】\s：:]+', '', raw)
+    return f"【{cleaned}】"
+
+
 def correct_heading_runaway(text: str) -> Tuple[str, int]:
     """
-    纠正标题越位与降级错误：
-    例如将长篇正文整段放在标题后面的情况：
-    ### 【徐注】阴阳之说，最为深奥，若非熟读阴阳五行……
-    纠正为：
-    #### 【徐注】
-
-    阴阳之说，最为深奥，若非熟读阴阳五行……
+    纠正评注越位、孤立评注标题与非标符号错误：
+    统一将所有评注（某某曰、某某注、原注、按语等）规范化为统一引用块粗体按语格式：
+    > **【某某注】**：正文……
+    彻底杜绝 H4 标题对全书 Heading Outline 与 SEO 大纲的污染。
     """
     lines = text.splitlines(keepends=True)
     out_lines = []
     fixed_count = 0
+    i = 0
+    n = len(lines)
 
-    # 匹配标题中嵌入评注且后跟长正文（超过6字或带有标点），使用通用评注标签正则
-    re_runaway = re.compile(rf'^(#{{1,6}})\s+({RE_COMMENTATOR_TAG.pattern})([\u4e00-\u9fa5，。、；！].*)$')
+    # 匹配内嵌评注长正文（如 ### 【徐注】阴阳之说... 或 「任氏曰】：干为天元...）
+    re_inline = re.compile(
+        rf'^(?:#{{1,6}}\s*|[「【\[])'
+        rf'({RE_COMMENTATOR_TAG.pattern}|[\u4e00-\u9fa5]{{1,6}}(?:曰|云|注|按|评|考|辨|疏|解|议|附|述|补|订|笺|释))'
+        rf'[」】\]]?\s*[：:]?\s*([\u4e00-\u9fa5].*)$'
+    )
 
-    for line in lines:
+    # 匹配独立评注标签行（如 #### 【任氏曰】 或 「任氏曰】：）
+    re_standalone = re.compile(
+        rf'^(?:#{{1,6}}\s*|[「【\[])'
+        rf'({RE_COMMENTATOR_TAG.pattern}|[\u4e00-\u9fa5]{{1,6}}(?:曰|云|注|按|评|考|辨|疏|解|议|附|述|补|订|笺|释))'
+        rf'[」】\]]?\s*[：:]?\s*$'
+    )
+
+    while i < n:
+        line = lines[i]
         stripped = line.strip()
-        m = re_runaway.match(stripped)
-        if m:
-            tag = m.group(2)
-            body = m.group(3).strip()
-            if len(body) > 6:
-                # 标题降为四级规范评注标题，正文成段
-                out_lines.append(f"#### {tag}\n\n{body}\n\n")
+
+        # 已经规范的引用块则直接保留
+        if stripped.startswith('>'):
+            out_lines.append(line)
+            i += 1
+            continue
+
+        # 1. 内嵌长文情况 (如 ### 【徐注】正文... 或 「任氏曰】：正文...)
+        m_in = re_inline.match(stripped)
+        if m_in:
+            tag = normalize_commentary_tag(m_in.group(1))
+            body = m_in.group(2).strip()
+            if len(body) >= 4:
+                out_lines.append(f"> **{tag}**：{body}\n\n")
                 fixed_count += 1
+                i += 1
+                continue
+
+        # 2. 独立标签行情况 (后随段落，如 #### 【任氏曰】\n\n正文...)
+        m_std = re_standalone.match(stripped)
+        if m_std:
+            tag = normalize_commentary_tag(m_std.group(1))
+            # 寻找后续第一行有效正文
+            j = i + 1
+            while j < n and lines[j].strip() == '':
+                j += 1
+            if j < n and not lines[j].strip().startswith('#') and not lines[j].strip().startswith('>'):
+                body = lines[j].strip()
+                out_lines.append(f"> **{tag}**：{body}\n\n")
+                fixed_count += 1
+                i = j + 1
                 continue
 
         out_lines.append(line)
+        i += 1
 
     return "".join(out_lines), fixed_count
 

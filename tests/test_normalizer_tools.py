@@ -45,8 +45,7 @@ class TestNormalizerTools(unittest.TestCase):
             "### 论天道\n\n"
             "欲识三元万法宗，先观帝载与神功。\n\n"
             "> **【原注】**：天有阴阳，地有刚柔。\n\n"
-            "#### 【任氏曰】\n\n"
-            "帝载神功，即阴阳造化之妙也。\n"
+            "> **【任氏曰】**：帝载神功，即阴阳造化之妙也。\n"
         )
         info = detect_paradigm(text)
         self.assertEqual(info["paradigm"], "B")
@@ -102,12 +101,12 @@ class TestNormalizerTools(unittest.TestCase):
         self.assertIn("天一生水，地六成之。", cleaned)
 
     def test_correct_heading_runaway(self):
-        """测试纠正标题内嵌入长段评注正文的越位错误"""
+        """测试纠正标题内嵌入长段评注正文，规整为引用块粗体按语（> **【某某注】**：...）"""
         raw = "### 【徐注】阴阳之说，最为深奥，学者若非深究其理，未易窥其门径。"
         cleaned, count = correct_heading_runaway(raw)
         self.assertEqual(count, 1)
-        self.assertIn("#### 【徐注】", cleaned)
-        self.assertIn("阴阳之说，最为深奥，学者若非深究其理，未易窥其门径。", cleaned)
+        self.assertIn("> **【徐注】**：阴阳之说，最为深奥，学者若非深究其理，未易窥其门径。", cleaned)
+        self.assertNotIn("#### 【徐注】", cleaned)
 
     def test_format_bazi_cases(self):
         """测试命例干支自动四柱排盘"""
@@ -162,10 +161,8 @@ class TestNormalizerTools(unittest.TestCase):
             "### 天道玄微\n"
             "天道冲虚，至妙潜通。\n\n"
             "> **【原注】**：此明大道本原。\n\n"
-            "#### 【张楠曰】\n"
-            "造化流行，莫非一气。\n\n"
-            "#### 【千里按】\n"
-            "学者不可不察。\n"
+            "> **【张楠曰】**：造化流行，莫非一气。\n\n"
+            "> **【千里按】**：学者不可不察。\n"
         )
         self.assertEqual(detect_paradigm(doc_b)["paradigm"], "B")
 
@@ -181,18 +178,21 @@ class TestNormalizerTools(unittest.TestCase):
         self.assertEqual(detect_paradigm(doc_c)["paradigm"], "C")
 
     def test_generalized_commentator_runaway(self):
-        """测试历代任意名家评注越位均可自适应纠正（张楠曰、千里按、朱子曰）"""
+        """测试历代任意名家评注越位均可自适应纠正为引用块粗体（张楠曰、千里按、朱子曰、OCR错位符号）"""
         test_cases = [
-            ("### 【张楠曰】阴阳顺逆之说，不可不知也。", "#### 【张楠曰】", "阴阳顺逆之说，不可不知也。"),
-            ("### 【千里按】此造日元极弱，全赖时支印绶化杀生身。", "#### 【千里按】", "此造日元极弱，全赖时支印绶化杀生身。"),
-            ("### 【朱子曰】易者，变易也，随天地气运而化生。", "#### 【朱子曰】", "易者，变易也，随天地气运而化生。"),
-            ("### 【先正云】官星佩印，贵不可言。", "#### 【先正云】", "官星佩印，贵不可言。"),
+            ("### 【张楠曰】阴阳顺逆之说，不可不知也。", "> **【张楠曰】**：", "阴阳顺逆之说，不可不知也。"),
+            ("### 【千里按】此造日元极弱，全赖时支印绶化杀生身。", "> **【千里按】**：", "此造日元极弱，全赖时支印绶化杀生身。"),
+            ("### 【朱子曰】易者，变易也，随天地气运而化生。", "> **【朱子曰】**：", "易者，变易也，随天地气运而化生。"),
+            ("### 【先正云】官星佩印，贵不可言。", "> **【先正云】**：", "官星佩印，贵不可言。"),
+            ("「任氏曰】：\n\n干为天元，支为地元，支中所藏为人元。", "> **【任氏曰】**：", "干为天元，支为地元，支中所藏为人元。"),
+            ("#### 【任氏曰】\n\n帝载神功，即阴阳造化之妙也。", "> **【任氏曰】**：", "帝载神功，即阴阳造化之妙也。"),
         ]
         for raw, expected_tag, expected_body in test_cases:
             cleaned, count = correct_heading_runaway(raw)
             self.assertEqual(count, 1, f"Failed on: {raw}")
             self.assertIn(expected_tag, cleaned)
             self.assertIn(expected_body, cleaned)
+            self.assertNotIn("####", cleaned)
 
     def test_generalized_bazi_prefixes(self):
         """测试多样化历史命例前缀均可自适应识别与四柱表格排盘"""
