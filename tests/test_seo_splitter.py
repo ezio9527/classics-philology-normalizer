@@ -172,6 +172,42 @@ class TestSEOSplitter(unittest.TestCase):
         self.assertIn("#### 乙丑时", c_text)
         self.assertIn("甲木得禄于寅", c_text)
 
+    def test_comprehensive_pinyin_slugs_and_chinese_numbers(self):
+        """测试零硬编码拼音引擎：涵盖高位卷数与经典复杂专名"""
+        self.assertEqual(to_pinyin_slug("卷十二"), "juan-12")
+        self.assertEqual(to_pinyin_slug("卷二十三"), "juan-23")
+        self.assertEqual(to_pinyin_slug("卷一百"), "juan-100")
+        self.assertEqual(to_pinyin_slug("神峰通考"), "shen-feng-tong-kao")
+        self.assertEqual(to_pinyin_slug("星平会海"), "xing-ping-hui-hai")
+        self.assertEqual(to_pinyin_slug("纳音取象"), "na-yin-qu-xiang")
+        self.assertEqual(to_pinyin_slug("御定子平八字"), "yu-ding-zi-ping-ba-zi")
+
+    def test_dynamic_author_attribution_without_hardcoding(self):
+        """测试非万民英著述（如任铁樵注疏本）动态解析真实作者，杜绝死板硬编码"""
+        book_path = self.test_dir / "di_tian_sui.md"
+        doc_content = (
+            "# 《滴天髓阐微》\n\n"
+            "> **版本考据**：清·任铁樵注疏。\n\n"
+            "## 通天论\n\n"
+            "### 论天道\n\n"
+            "欲识三元万法宗，先观帝载与神功。\n"
+        )
+        with open(book_path, 'w', encoding='utf-8') as f:
+            f.write(doc_content)
+
+        out_dir = self.test_dir / "dist_dts"
+        splitter = SEOSplitter(input_file=book_path, output_dir=out_dir)
+        splitter.split_and_generate()
+
+        chap_file = out_dir / "di-tian-sui-chan-wei" / "tong-tian-lun" / "01_lun-tian-dao.md"
+        self.assertTrue(chap_file.exists())
+        with open(chap_file, 'r', encoding='utf-8') as f:
+            text = f.read()
+
+        # 必须正确体现清·任铁樵，绝不可死板出现明·万民英
+        self.assertIn("清·任铁樵《滴天髓阐微》· 通天论", text)
+        self.assertNotIn("万民英", text)
+
 
 if __name__ == "__main__":
     unittest.main()

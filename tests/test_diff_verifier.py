@@ -82,6 +82,23 @@ class TestDiffVerifier(unittest.TestCase):
         self.assertLess(report["similarity"], 0.998)
         self.assertTrue(len(report["sample_diffs"]) > 0)
 
+    def test_chinese_numbering_and_thematic_breaks(self):
+        """测试中文枚举编号 (1、) 与 Markdown 分割线 (---) 不破坏保真门禁"""
+        original = (
+            "1、天道：欲识三元万法宗，先观帝载与神功。\n"
+            "2、地道：坤元合德机缄通，五气偏全定吉凶。\n"
+        )
+        cleaned = (
+            "### 天道\n\n"
+            "欲识三元万法宗，先观帝载与神功。\n\n"
+            "---\n\n"
+            "### 地道\n\n"
+            "坤元合德机缄通，五气偏全定吉凶。\n"
+        )
+        report = verify_text_invariance(original, cleaned, threshold=0.998)
+        self.assertTrue(report["passed"], f"Expected pass, got: {report}")
+        self.assertEqual(report["similarity"], 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

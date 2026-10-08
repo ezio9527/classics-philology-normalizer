@@ -69,10 +69,17 @@ def strip_markdown(text: str) -> str:
     # 移除表格对齐标记行 (e.g. | :---: | :---: |)
     text = re.sub(r'\|[\s:\-]+\|[\s:\-|]*', '', text)
 
+    # 移除水平分割线 (---, ***, ___)
+    text = re.sub(r'^[ \t]*[-*_]{3,}[ \t]*$', '', text, flags=re.MULTILINE)
+
+    # 移除零宽字符与软连字符 (如 \xad, \u200b 等网络采集噪音)
+    text = re.sub(r'[\xad\u200b-\u200f\ufeff]', '', text)
+
     # 移除 Markdown 结构符号：#、>、|、-、*、_、~
     lines = text.splitlines()
     cleaned_lines = []
     prev_heading = ""
+    seen_h1 = ""
 
     for line in lines:
         stripped = line.strip()
@@ -83,14 +90,21 @@ def strip_markdown(text: str) -> str:
         m_head = re.match(r'^(#{1,6})\s+(.*)$', stripped)
         if m_head:
             curr_heading = m_head.group(2).strip()
-            # 过滤机械标题回声（连续紧挨着的同名标题）
-            if curr_heading == prev_heading:
+            level = m_head.group(1)
+            norm_head = re.sub(r'[\s\-、，。：:《》【】\[\]()（）\xad]+', '', curr_heading)
+
+            if level == '#':
+                seen_h1 = norm_head
+
+            # 过滤机械标题回声（连续同名，或紧随的章节标题与 H1 相同）
+            if norm_head == prev_heading or (norm_head and norm_head == seen_h1 and level != '#'):
                 continue
-            prev_heading = curr_heading
-            # 移除命例标题结构前缀 如 ##### 命例：
-            curr_heading = re.sub(r'^命例[：:]\s*', '', curr_heading)
+            prev_heading = norm_head
+
+            # 移除命例标题结构前缀 如 ##### 命例： 或 ##### 命造：
+            curr_heading = re.sub(r'^(?:命例|命造|案例|案谱)[：:]\s*', '', curr_heading)
             # 移除书名号《》若其仅包裹在H1书名处
-            if m_head.group(1) == '#':
+            if level == '#':
                 curr_heading = re.sub(r'^[《〈](.*?)[》〉]$', r'\1', curr_heading)
             cleaned_lines.append(curr_heading)
             continue
@@ -101,8 +115,8 @@ def strip_markdown(text: str) -> str:
         stripped = re.sub(r'^>+\s*', '', stripped)
         # 剥离无序列表符 -、*、+
         stripped = re.sub(r'^[\-\*\+]\s+', '', stripped)
-        # 剥离有序列表数字 1. 2.
-        stripped = re.sub(r'^\d+\.\s+', '', stripped)
+        # 剥离有序列表数字 1. 2. 以及中文枚举 1、 2、
+        stripped = re.sub(r'^\d+[、\.]\s*', '', stripped)
         # 剥离行内加粗、斜体与删除线
         stripped = re.sub(r'[\*_~]{1,3}', '', stripped)
         # 剥离表格前后竖线与空格
@@ -162,9 +176,14 @@ def verify_text_invariance(
             "diff_summary": "原始文档提取纯文本为空"
         }
 
-    # 使用 SequenceMatcher 计算相似度
-    matcher = difflib.SequenceMatcher(None, norm_orig, norm_clean, autojunk=False)
-    similarity = matcher.ratio()
+    # 快速路径：若文本完全一致，直接通过，避免超长古籍执行二次方复杂度的 SequenceMatcher
+    if norm_orig == norm_clean:
+        similarity = 1.0
+        matcher = None
+    else:
+        # 使用 SequenceMatcher 计算相似度
+        matcher = difflib.SequenceMatcher(None, norm_orig, norm_clean, autojunk=False)
+        similarity = matcher.ratio()
 
     diff_chars = abs(len_orig - len_clean)
     passed = similarity >= threshold

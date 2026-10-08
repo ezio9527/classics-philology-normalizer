@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Classics Philology Normalizer Configuration",
+  "description": "古籍文献规范化与 SEO 拆分自定义配置文件（可在工作区根目录放置 classics_config.json 自定义规则）",
+  "custom_pinyin": {
+    "䷀": "qian",
+    "䷁": "kun"
+  },
+  "custom_words": {
+    "玄牝之门": "xuan-pin-zhi-men"
+  },
+  "custom_commentator_tags": [
+    "张楠曰",
+    "千里按",
+    "朱子曰"
+  ],
+  "author_attributions": {
+    "三命通会": "明·万民英",
+    "滴天髓阐微": "清·任铁樵",
+    "子平真诠": "清·沈孝瞻",
+    "穷通宝鉴": "清·徐乐吾",
+    "八字提要": "民国·韦千里"
+  }
+}

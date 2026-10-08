@@ -142,6 +142,73 @@ class TestNormalizerTools(unittest.TestCase):
         self.assertIn("- [卷二](#卷二)", updated)
         self.assertIn("  - [论十干分配天文](#论十干分配天文)", updated)
 
+    def test_unseen_book_paradigm_detection_without_hardcoding(self):
+        """测试对完全未知的书名，纯依靠 AST 拓扑结构正确判定范式（杜绝硬编码）"""
+        # 未见汇编全书
+        doc_a = (
+            "# 《青囊玄髓大成》\n\n"
+            "## 卷一\n\n"
+            "### 论阴阳互根\n正文...\n"
+            "### 论五行气数\n正文...\n"
+            "## 卷二\n\n"
+            "### 论四象配合\n正文...\n"
+        )
+        self.assertEqual(detect_paradigm(doc_a)["paradigm"], "A")
+
+        # 未见经注本
+        doc_b = (
+            "# 《玄天古经解注》\n\n"
+            "## 上篇\n\n"
+            "### 天道玄微\n"
+            "天道冲虚，至妙潜通。\n\n"
+            "> **【原注】**：此明大道本原。\n\n"
+            "#### 【张楠曰】\n"
+            "造化流行，莫非一气。\n\n"
+            "#### 【千里按】\n"
+            "学者不可不察。\n"
+        )
+        self.assertEqual(detect_paradigm(doc_b)["paradigm"], "B")
+
+        # 未见时令矩阵
+        doc_c = (
+            "# 《历代节令指南》\n\n"
+            "## 寅月\n\n"
+            "### 甲日\n初春木嫩。\n"
+            "### 乙日\n初春喜火。\n"
+            "## 卯月\n\n"
+            "### 甲日\n仲春乘旺。\n"
+        )
+        self.assertEqual(detect_paradigm(doc_c)["paradigm"], "C")
+
+    def test_generalized_commentator_runaway(self):
+        """测试历代任意名家评注越位均可自适应纠正（张楠曰、千里按、朱子曰）"""
+        test_cases = [
+            ("### 【张楠曰】阴阳顺逆之说，不可不知也。", "#### 【张楠曰】", "阴阳顺逆之说，不可不知也。"),
+            ("### 【千里按】此造日元极弱，全赖时支印绶化杀生身。", "#### 【千里按】", "此造日元极弱，全赖时支印绶化杀生身。"),
+            ("### 【朱子曰】易者，变易也，随天地气运而化生。", "#### 【朱子曰】", "易者，变易也，随天地气运而化生。"),
+            ("### 【先正云】官星佩印，贵不可言。", "#### 【先正云】", "官星佩印，贵不可言。"),
+        ]
+        for raw, expected_tag, expected_body in test_cases:
+            cleaned, count = correct_heading_runaway(raw)
+            self.assertEqual(count, 1, f"Failed on: {raw}")
+            self.assertIn(expected_tag, cleaned)
+            self.assertIn(expected_body, cleaned)
+
+    def test_generalized_bazi_prefixes(self):
+        """测试多样化历史命例前缀均可自适应识别与四柱表格排盘"""
+        samples = [
+            ("某尚书造 丙寅 庚寅 丙申 己丑 评析：木火通明之格。", "##### 命例：某尚书造"),
+            ("坤造 乙丑 己卯 戊子 癸亥 评析：财官双美。", "##### 命例：坤造"),
+            ("一富商造 壬子 壬子 壬子 壬子 评析：润下成格。", "##### 命例：一富商造"),
+            ("岳武穆命 癸未 乙卯 甲子 己巳 评析：精忠报国之造。", "##### 命例：岳武穆命"),
+            ("又一造 甲子 丙子 戊子 庚申 评析：地支一气。", "##### 命例：又一造"),
+        ]
+        for raw, expected_heading in samples:
+            formatted, count = format_bazi_cases(raw)
+            self.assertEqual(count, 1, f"Failed on: {raw}")
+            self.assertIn(expected_heading, formatted)
+            self.assertIn("| 年柱 | 月柱 | 日柱 | 时柱 |", formatted)
+
 
 if __name__ == "__main__":
     unittest.main()

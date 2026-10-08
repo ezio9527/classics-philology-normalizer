@@ -23,79 +23,14 @@ from typing import Dict, List, Tuple, Optional, Any
 
 # 导入同级 normalizer_tools 与 diff_verifier 模块
 try:
-    from normalizer_tools import detect_paradigm
+    from normalizer_tools import detect_paradigm, RE_COMMENTATOR_TAG
     from diff_verifier import verify_text_invariance
+    from pinyin_dict import to_pinyin_slug, chinese_to_number
 except ImportError:
     sys.path.append(str(Path(__file__).parent))
-    from normalizer_tools import detect_paradigm
+    from normalizer_tools import detect_paradigm, RE_COMMENTATOR_TAG
     from diff_verifier import verify_text_invariance
-
-# 常用天干地支与经典古籍汉字拼音字典（支持零依赖纯标准库环境生成优雅 Slug）
-PINYIN_MAP = {
-    # 天干
-    "甲": "jia", "乙": "yi", "丙": "bing", "丁": "ding", "戊": "wu",
-    "己": "ji", "庚": "geng", "辛": "xin", "壬": "ren", "癸": "gui",
-    # 地支
-    "子": "zi", "丑": "chou", "寅": "yin", "卯": "mao", "辰": "chen",
-    "巳": "si", "午": "wu", "未": "wei", "申": "shen", "酉": "you",
-    "戌": "xu", "亥": "hai",
-    # 常用文献字
-    "卷": "juan", "篇": "pian", "章": "zhang", "节": "jie", "论": "lun",
-    "原": "yuan", "通": "tong", "会": "hui", "滴": "di", "天": "tian",
-    "髓": "sui", "阐": "chan", "微": "wei", "真": "zhen", "诠": "quan",
-    "宝": "bao", "鉴": "jian", "提": "ti", "要": "yao", "穷": "qiong",
-    "五": "wu", "行": "xing", "生": "sheng", "成": "cheng", "克": "ke",
-    "大": "da", "义": "yi", "道": "dao", "理": "li", "气": "qi",
-    "日": "ri", "月": "yue", "时": "shi", "年": "nian", "造": "zao",
-    "化": "hua", "神": "shen", "煞": "sha", "十": "shi", "干": "gan",
-    "支": "zhi", "源": "yuan", "流": "liu", "配": "pei", "地": "di",
-    "文": "wen", "赋": "fu", "歌": "ge", "诀": "jue", "命": "ming",
-    "字": "zi", "书": "shu", "平": "ping", "精": "jing", "考": "kao",
-    "渊": "yuan", "海": "hai", "峰": "feng", "注": "zhu", "集": "ji",
-    "分": "fen", "辨": "bian", "述": "shu", "合": "he", "制": "zhi",
-    "刑": "xing", "冲": "chong", "破": "po", "害": "hai", "衰": "shuai",
-    "旺": "wang", "休": "xiu", "囚": "qiu", "死": "si", "绝": "jue",
-    "阴": "yin", "阳": "yang", "乾": "qian", "坤": "kun", "官": "guan",
-    "杀": "sha", "印": "yin", "财": "cai", "食": "shi", "伤": "shang",
-    "一": "yi", "二": "er", "三": "san", "四": "si", "五": "wu",
-    "六": "liu", "七": "qi", "八": "ba", "九": "jiu",
-    "上": "shang", "中": "zhong", "下": "xia", "前": "qian", "序": "xu",
-    "言": "yan", "目": "mu", "录": "lu", "凡": "fan", "例": "li"
-}
-
-NUM_MAP = {
-    "一": "01", "二": "02", "三": "03", "四": "04", "五": "05",
-    "六": "06", "七": "07", "八": "08", "九": "09", "十": "10",
-    "十一": "11", "十二": "12", "十三": "13", "十四": "14", "十五": "15"
-}
-
-
-def to_pinyin_slug(text: str) -> str:
-    """将古籍标题转为干净规范的 URL Slug"""
-    text = re.sub(r'^[《〈](.*?)[》〉]$', r'\1', text.strip())
-
-    # 针对 卷一、卷二... 规范为 juan-01, juan-02
-    m_juan = re.match(r'^卷([一二三四五六七八九十0-9]+)$', text)
-    if m_juan:
-        num_str = m_juan.group(1)
-        val = NUM_MAP.get(num_str, num_str)
-        return f"juan-{val}"
-
-    slug_parts = []
-    for char in text:
-        if char in PINYIN_MAP:
-            slug_parts.append(PINYIN_MAP[char])
-        elif re.match(r'[a-zA-Z0-9]', char):
-            slug_parts.append(char.lower())
-        elif re.match(r'[\u4e00-\u9fa5]', char):
-            # 未在基础词典中的生僻汉字，使用 Unicode 码点缩写作为 fallback
-            slug_parts.append(f"c{ord(char):x}")
-        elif char in [' ', '-', '_']:
-            slug_parts.append('-')
-
-    slug = '-'.join(p.strip('-') for p in slug_parts if p.strip('-'))
-    slug = re.sub(r'-+', '-', slug).strip('-')
-    return slug if slug else "section"
+    from pinyin_dict import to_pinyin_slug, chinese_to_number
 
 
 def extract_description(content: str, max_chars: int = 140) -> str:
@@ -124,14 +59,22 @@ def extract_description(content: str, max_chars: int = 140) -> str:
 
 
 def extract_keywords(book: str, volume: str, chapter: str, content: str) -> List[str]:
-    """提取核心命理与文献 SEO 关键词"""
+    """提取核心命理与文献 SEO 关键词（纯动态与文献学通用提取，零人名白名单硬编码）"""
     keywords = [book, volume, chapter]
 
     candidates = [
         "五行", "天干", "地支", "月令", "日主", "命例", "正印", "偏印",
         "正官", "七杀", "正财", "偏财", "食神", "伤官", "比肩", "劫财",
-        "长生", "禄位", "通根", "透干", "原注", "任氏曰", "徐乐吾", "沈孝瞻"
+        "长生", "禄位", "通根", "透干", "原注", "纳音", "用神", "格局"
     ]
+
+    # 动态匹配正文中出现的评注家名（从通用标签提取）
+    comm_tags = RE_COMMENTATOR_TAG.findall(content)
+    for tag in comm_tags:
+        pure_name = re.sub(r'[【】]', '', tag)
+        if pure_name not in candidates:
+            candidates.append(pure_name)
+
     for c in candidates:
         if c in content and c not in keywords:
             keywords.append(c)
@@ -142,18 +85,20 @@ def extract_keywords(book: str, volume: str, chapter: str, content: str) -> List
 
 
 class SEOSplitter:
-    def __init__(self, input_file: Path, output_dir: Path, base_url: str = "/classics", split_level: int = 3):
+    def __init__(self, input_file: Path, output_dir: Path, base_url: str = "/classics", split_level: int = 3, config_path: Optional[Path] = None):
         self.input_file = input_file
         self.output_dir = output_dir
         self.base_url = base_url.rstrip('/')
         self.split_level = split_level
+        self.config_path = config_path
 
         with open(input_file, 'r', encoding='utf-8', errors='ignore') as f:
             self.raw_content = f.read()
 
-        self.paradigm_info = detect_paradigm(self.raw_content)
+        self.paradigm_info = detect_paradigm(self.raw_content, config_path=self.config_path)
         self.book_title = self._parse_book_title()
         self.book_slug = to_pinyin_slug(self.book_title)
+        self.author = self._parse_author()
 
     def _parse_book_title(self) -> str:
         """解析全书根标题 H1"""
@@ -163,6 +108,29 @@ class SEOSplitter:
             # 移除书名号
             return re.sub(r'^[《〈](.*?)[》〉]$', r'\1', raw)
         return self.input_file.stem
+
+    def _parse_author(self) -> str:
+        """解析典籍著者/版本朝代信息（优先配置覆盖，次之从前言考据解析，杜绝死板硬编码）"""
+        # 1. 检查配置文件
+        cfg_file = self.config_path or Path("classics_config.json")
+        if cfg_file.exists():
+            try:
+                with open(cfg_file, 'r', encoding='utf-8') as f:
+                    cfg = json.load(f)
+                    if "author_attributions" in cfg and self.book_title in cfg["author_attributions"]:
+                        return cfg["author_attributions"][self.book_title]
+            except Exception:
+                pass
+
+        # 2. 从前言引用块自动提取朝代与作者（如 > **版本考据**：明·万民英纂辑 或 > **著者**：清·任铁樵）
+        m_auth = re.search(
+            r'>\s*\*{0,2}(?:版本考据|著者|作者|注疏|考证)\*{0,2}[：:]\s*([\u4e00-\u9fa5·]{2,8}?)(?:注疏|纂辑|撰|著|辑|校|疏|述|订|按|原著|。|\s|$)',
+            self.raw_content
+        )
+        if m_auth:
+            return m_auth.group(1).strip()
+
+        return ""
 
     def parse_structure(self) -> Tuple[str, List[Dict[str, Any]]]:
         """
@@ -474,12 +442,15 @@ class SEOSplitter:
         frontmatter_lines.append("---\n")
 
         # 页面正文构建
+        author_prefix = f"{self.author}" if self.author else ""
+        attrib_str = f"{author_prefix}《{self.book_title}》· {v_title}" if author_prefix else f"《{self.book_title}》· {v_title}"
+
         page_lines = [
             "\n".join(frontmatter_lines),
             f"<!-- 面包屑导航 -->",
             f"[典籍首页]({self.base_url}) / [《{self.book_title}》]({book_url}) / [{v_title}]({vol_url}) / {c_title}\n",
             f"# {c_title}\n",
-            f"> **典籍归属**：明·万民英《{self.book_title}》· {v_title}\n",
+            f"> **典籍归属**：{attrib_str}\n",
         ]
 
         # 纯正文内容（移除章节原有的 ### 标题，因为上方已有页面主 H1）
@@ -517,6 +488,7 @@ def main():
     parser.add_argument("-o", "--output-dir", default="dist_seo", help="SEO 静态站切片输出根目录（默认 dist_seo）")
     parser.add_argument("-b", "--base-url", default="/classics", help="站内根路由前缀（默认 /classics）")
     parser.add_argument("-l", "--level", type=int, default=3, help="切分目标层级（默认 3，即 H3 篇章/日主）")
+    parser.add_argument("-c", "--config", help="自定义规则与元数据配置文件路径 (默认自动加载 ./classics_config.json)")
 
     args = parser.parse_args()
 
@@ -527,11 +499,14 @@ def main():
         print(f"错误: 输入文件不存在: {input_path}", file=sys.stderr)
         sys.exit(1)
 
+    config_path = Path(args.config) if getattr(args, 'config', None) else None
+
     splitter = SEOSplitter(
         input_file=input_path,
         output_dir=output_dir,
         base_url=args.base_url,
-        split_level=args.level
+        split_level=args.level,
+        config_path=config_path
     )
 
     result = splitter.split_and_generate()

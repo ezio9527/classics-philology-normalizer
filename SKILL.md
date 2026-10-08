@@ -324,8 +324,8 @@ graph LR
 
 * **体例治理与特征识别辅助工具 (`normalizer_tools.py`)**：
   ```bash
-  # 自动检测典籍编纂范式 (范式 A / B / C)
-  python3 resources/scripts/normalizer_tools.py detect-paradigm -i raw_book.md
+  # 自动检测典籍编纂范式 (纯 AST 拓扑结构判定，零硬编码；支持可选 -c 指定配置)
+  python3 resources/scripts/normalizer_tools.py detect-paradigm -i raw_book.md [-c classics_config.json]
 
   # 自动清理机械标题回声
   python3 resources/scripts/normalizer_tools.py suppress-echoes -i raw_book.md -o no_echo.md
@@ -333,19 +333,27 @@ graph LR
   # 自动清理爬虫残留与无用页面标记
   python3 resources/scripts/normalizer_tools.py clean-crawler-noise -i raw_book.md -o no_crawler.md
 
-  # 自动将命例八字排盘转换为标准四柱表格
+  # 自动将命例八字排盘转换为标准四柱表格（涵盖乾造、坤造、某尚书造、岳武穆命等通用前缀）
   python3 resources/scripts/normalizer_tools.py format-bazi -i raw_book.md -o formatted.md
 
   # 依据正文 AST 自动提取并扩展多级嵌套目录 (默认展开至 H3 篇章/日主)
   python3 resources/scripts/normalizer_tools.py expand-toc -i raw_book.md -o with_toc.md -d 3
+
+  # SEO 静态站原子化章节拆分引擎
+  python3 resources/scripts/normalizer_tools.py seo-split -i golden_book.md -o dist_seo/ -b /classics
   ```
 
-### 2. 标准化体例模板 (`resources/templates/`)
+* **零依赖拼音与数字转换引擎 (`pinyin_dict.py`)**：
+  内置 4,299 个通用规范与文献专有汉字拼音映射、经典术数多音字消歧（五行、乾坤、长生、徐乐吾等），以及任意中文卷数/章节序号转换（如 `卷二十三` -> `juan-23`）。
+
+### 2. 标准化体例模板与配置 (`resources/templates/`)
+* `resources/templates/classics_config.example.json`：全局自定义配置模板（支持自定义字音、生僻字、专有词、评注标签与著者覆盖）
 * `resources/templates/paradigm_A_template.md`：范式 A【汇编全书型】标准骨架
 * `resources/templates/paradigm_B_template.md`：范式 B【主干经注型】标准骨架
 * `resources/templates/paradigm_C_template.md`：范式 C【纲目矩阵型】标准骨架
 * `resources/templates/bazi_table_template.md`：命造实证四柱排盘与评析规范
 * `resources/templates/chunk_manifest_template.json`：分治切片治理清单元数据模型
+* `resources/templates/seo_page_template.md`：SEO 原子化章节静态站页面标准模板
 
 ### 3. 本地规范文档格式说明书 (`references/`)
 * 权威排版白皮书：[references/DOCUMENT_FORMAT_SPEC.md](./references/DOCUMENT_FORMAT_SPEC.md)

@@ -36,13 +36,42 @@ CRAWLER_NOISE_REGEXES = [
 ]
 
 
-def detect_paradigm(text: str) -> Dict[str, Any]:
+# 通用古典文献评注/按语标签正则（覆盖历代名家、原注、考释，彻底杜绝硬编码）
+RE_COMMENTATOR_TAG = re.compile(
+    r'【(?:原注|附注|夹注|按语|先正云|前贤云|古歌云|经云|赋云|古诀云|通会云|'
+    r'[\u4e00-\u9fa5]{1,6}(?:曰|云|注|按|评|考|辨|疏|解|议|附|述|补|订|笺|释))】'
+)
+
+
+def detect_paradigm(text: str, config_path: Path = None) -> Dict[str, Any]:
     """
-    通过文本结构、标题与关键词自动判定典籍所属范式：
-    - 范式 A【汇编全书型】（如《三命通会》《渊海子平》）：拓扑为 卷 -> 篇/章 -> 小节/歌赋
-    - 范式 B【主干经注型】（如《滴天髓阐微》《子平真诠》）：拓扑为 卷/篇 -> 核心论章 -> 经文/原注/名家评注/命例
-    - 范式 C【纲目矩阵型】（如《八字提要》《穷通宝鉴》）：拓扑为 月令(纲) -> 日主(目) -> 时辰(条)
+    通过文本结构、拓扑与文献学特征纯粹自适应判定典籍所属范式（零硬编码）：
+    - 范式 A【汇编全书型】：拓扑为 卷 (宏观容器) -> 篇/章 (独立论题) -> 小节/歌赋
+    - 范式 B【主干经注型】：拓扑为 卷/篇 -> 核心经文 -> 原注/多层名家评注/实证命例
+    - 范式 C【纲目矩阵型】：拓扑为 月令(纲) -> 日主(目) -> 时辰(条) 矩阵推演
     """
+    # 检查是否有用户自定义配置覆盖
+    cfg_file = config_path or Path("classics_config.json")
+    if cfg_file.exists():
+        try:
+            with open(cfg_file, 'r', encoding='utf-8') as f:
+                cfg = json.load(f)
+                h1_m = re.search(r'^#\s+(.+)$', text, re.MULTILINE)
+                book_name = re.sub(r'^[《〈](.*?)[》〉]$', r'\1', h1_m.group(1).strip()) if h1_m else ""
+                if "paradigm_overrides" in cfg and book_name in cfg["paradigm_overrides"]:
+                    p_override = cfg["paradigm_overrides"][book_name]
+                    p_names = {"A": "汇编全书型", "B": "主干经注型", "C": "纲目矩阵型"}
+                    return {
+                        "paradigm": p_override,
+                        "name": p_names.get(p_override, "自定义范式"),
+                        "score": 100,
+                        "topology": "由用户配置文件显式指定",
+                        "reasons": [f"配置文件 classics_config.json 显式指定《{book_name}》为范式 {p_override}"],
+                        "all_scores": {p_override: 100}
+                    }
+        except Exception:
+            pass
+
     score_a = 0
     score_b = 0
     score_c = 0
@@ -51,43 +80,39 @@ def detect_paradigm(text: str) -> Dict[str, Any]:
     reasons_b = []
     reasons_c = []
 
-    # 检查纲目矩阵特征 (范式 C)
+    # 1. 结构特征统计：检查纲目矩阵特征 (范式 C)
     month_hits = sum(1 for m in MONTH_BRANCHES if m in text)
     day_hits = sum(1 for d in DAY_MASTERS if d in text)
+    month_headings = len(re.findall(r'^#+\s+[寅卯辰巳午未申酉戌亥正二三四五六七八九十冬腊]月', text, re.MULTILINE))
+    day_headings = len(re.findall(r'^#+\s+[甲乙丙丁戊己庚辛壬癸]日', text, re.MULTILINE))
     matrix_pattern_hits = len(re.findall(r'[寅卯辰巳午未申酉戌亥]月[甲乙丙丁戊己庚辛壬癸]日', text))
 
-    if month_hits >= 6 and (day_hits >= 5 or matrix_pattern_hits >= 3):
-        score_c += 80
-        reasons_c.append(f"命中 {month_hits} 个月令纲目与 {day_hits} 个日主目节点，存在典型干支时辰矩阵结构")
+    if month_headings >= 2 or (month_hits >= 5 and (day_hits >= 3 or matrix_pattern_hits >= 2)):
+        c_weight = 50 + min(month_headings * 10, 30) + min(day_headings * 5, 20) + min(matrix_pattern_hits * 5, 20)
+        score_c += c_weight
+        reasons_c.append(f"命中 {month_hits} 个月令与 {day_hits} 个日主节点（含 {month_headings} 处月令标题、{day_headings} 处日主标题），呈现纲目矩阵结构")
 
-    if "八字提要" in text or "穷通宝鉴" in text or "栏江网" in text:
-        score_c += 50
-        reasons_c.append("书名/文本高度关联经典纲目矩阵著作")
+    # 2. 结构特征统计：检查主干经注型特征 (范式 B)
+    comm_tags = RE_COMMENTATOR_TAG.findall(text)
+    comm_hits = len(comm_tags)
+    blockquote_notes = len(re.findall(r'>\s*\*{0,2}【[^】]+】\*{0,2}', text))
+    total_comm_signals = comm_hits + blockquote_notes
 
-    # 检查主干经注型特征 (范式 B)
-    commentary_tokens = ['原注', '任氏曰', '徐注', '任铁樵', '沈氏曰', '沈孝瞻', '先正云', '注曰']
-    comm_hits = sum(len(re.findall(rf'【?{tok}】?', text)) for tok in commentary_tokens)
-    if comm_hits >= 5:
-        score_b += 40 + min(comm_hits * 3, 50)
-        reasons_b.append(f"命中大量夹注与注疏评语标记（共 {comm_hits} 处），符合经注体例")
+    if total_comm_signals >= 2:
+        b_weight = 40 + min(total_comm_signals * 15, 60)
+        score_b += b_weight
+        reasons_b.append(f"命中 {comm_hits} 处名家注疏标签与 {blockquote_notes} 处引用原注块，呈现典型主干经注与层级评注体例")
 
-    if "滴天髓" in text or "子平真诠" in text:
-        score_b += 50
-        reasons_b.append("书名/文本高度关联主干经注文献")
+    # 3. 结构特征统计：检查汇编全书型特征 (范式 A)
+    juan_headings = len(re.findall(r'^#+\s+卷[一二三四五六七八九十0-9]+', text, re.MULTILINE))
+    treatise_headings = len(re.findall(r'^#+\s+(?:论[\u4e00-\u9fa5]+|[\u4e00-\u9fa5]+(?:篇|赋|歌|诀|辩|法))', text, re.MULTILINE))
 
-    # 检查汇编全书型特征 (范式 A)
-    juan_headings = len(re.findall(r'#+\s+卷[一二三四五六七八九十0-9]+', text))
-    lun_headings = len(re.findall(r'#+\s+论[\u4e00-\u9fa5]+', text))
     if juan_headings >= 2:
-        score_a += 30 + min(juan_headings * 5, 40)
-        reasons_a.append(f"命中 {juan_headings} 个宏观卷容器标题")
-    if lun_headings >= 5:
-        score_a += 30
-        reasons_a.append(f"命中 {lun_headings} 个论题篇章标题")
-
-    if "三命通会" in text or "渊海子平" in text or "神峰通考" in text or "星平会海" in text:
-        score_a += 50
-        reasons_a.append("书名/文本高度关联集大成汇编全书")
+        score_a += 40 + min(juan_headings * 5, 40)
+        reasons_a.append(f"命中 {juan_headings} 个宏观卷容器标题（如 ## 卷一、## 卷二），符合大部头全书分卷体例")
+    if treatise_headings >= 2:
+        score_a += 35 + min(treatise_headings * 5, 35)
+        reasons_a.append(f"命中 {treatise_headings} 个独立专题篇目/篇赋标题（如 ### 论...），呈现多篇章汇编特征")
 
     scores = [
         ("A", "汇编全书型", score_a, reasons_a, "# 书名 -> ## 卷 N (容器) -> ### 篇/章 (论题) -> #### 小节/歌赋"),
@@ -176,8 +201,8 @@ def correct_heading_runaway(text: str) -> Tuple[str, int]:
     out_lines = []
     fixed_count = 0
 
-    # 匹配标题中嵌入评注且后跟长正文（超过15字或带有标点）
-    re_runaway = re.compile(r'^(#{1,6})\s+(【(?:徐注|任氏曰|沈注|注|原注|评)】)([\u4e00-\u9fa5，。、；！].*)$')
+    # 匹配标题中嵌入评注且后跟长正文（超过6字或带有标点），使用通用评注标签正则
+    re_runaway = re.compile(rf'^(#{{1,6}})\s+({RE_COMMENTATOR_TAG.pattern})([\u4e00-\u9fa5，。、；！].*)$')
 
     for line in lines:
         stripped = line.strip()
@@ -211,10 +236,21 @@ def format_bazi_cases(text: str) -> Tuple[str, int]:
     count = 0
 
     # 匹配四柱干支模式：如 "壬寅 丁未 己卯 乙亥" 或 "壬寅、丁未、己卯、乙亥"
+    # 通用前缀匹配：乾造、坤造、某官造、某侍郎造、李尚书造、一富商造、岳武穆命、命造、又一造、例如等
     gz = f"[{TIANGAN}][{DIZHI}]"
     sep = r'[\s、，\t]+'
     re_four_pillars = re.compile(
-        rf'(?:([乾坤]造|某[官士商儒人]?造|命造|例[：:]|如|又)?[\s：:]*)?'
+        rf'(?:('
+        rf'[乾坤]造|'
+        rf'某[\u4e00-\u9fa5]{{1,4}}造|'
+        rf'[\u4e00-\u9fa5]{{1,6}}[氏公翁母儿郎官士商儒民]造|'
+        rf'[\u4e00-\u9fa5]{{1,6}}[造命案格]|'
+        rf'命[例造谱案]|'
+        rf'案[例谱]|'
+        rf'又[一造]?|'
+        rf'如[：:]?|'
+        rf'例[：:]?'
+        rf')[\s：:]*)?'
         rf'({gz}){sep}({gz}){sep}({gz}){sep}({gz})'
     )
 
@@ -281,8 +317,8 @@ def generate_toc(text: str, max_depth: int = 3) -> str:
         max_depth = min(max_depth, 3)
 
     re_heading = re.compile(r'^(#{2,6})\s+(.*)$')
-    # 评注和命例微观标题正则，不应录入总目录
-    re_skip = re.compile(r'^(?:【(?:原注|任氏曰|徐注|沈注|注|评)】|命例[：:]|命造[：:]|目录)')
+    # 评注和命例微观标题正则，不应录入总目录（基于通用评注正则）
+    re_skip = re.compile(rf'^(?:{RE_COMMENTATOR_TAG.pattern}|命[例造谱案][：:]|案[例谱][：:]|目录)')
 
     has_entries = False
     for line in lines:
@@ -342,11 +378,13 @@ def main():
     parser = argparse.ArgumentParser(
         description="古籍文献体例规范化与校勘辅助工具箱"
     )
+    parser.add_argument("-c", "--config", help="自定义规则与元数据配置文件路径 (默认自动加载 ./classics_config.json)")
     subparsers = parser.add_subparsers(dest="command", help="子命令")
 
     # detect-paradigm
     p_detect = subparsers.add_parser("detect-paradigm", help="判定古籍文献典籍编纂范式")
     p_detect.add_argument("-i", "--input", required=True, help="古籍 Markdown 文件路径")
+    p_detect.add_argument("-c", "--config", help="自定义规则与元数据配置文件路径")
 
     # suppress-echoes
     p_echo = subparsers.add_parser("suppress-echoes", help="消除机械标题回声")
@@ -375,6 +413,7 @@ def main():
     p_seo.add_argument("-o", "--output-dir", default="dist_seo", help="静态站切片输出根目录（默认 dist_seo）")
     p_seo.add_argument("-b", "--base-url", default="/classics", help="站内根路由前缀（默认 /classics）")
     p_seo.add_argument("-l", "--level", type=int, default=3, help="切分目标层级（默认 3）")
+    p_seo.add_argument("-c", "--config", help="自定义规则与元数据配置文件路径")
 
     args = parser.parse_args()
 
@@ -390,8 +429,10 @@ def main():
     with open(input_path, 'r', encoding='utf-8', errors='ignore') as f:
         content = f.read()
 
+    config_path = Path(args.config) if getattr(args, 'config', None) else None
+
     if args.command == "detect-paradigm":
-        info = detect_paradigm(content)
+        info = detect_paradigm(content, config_path=config_path)
         print("=" * 65)
         print("🏛️ 典籍编纂范式判定报告 (Typology Classification)")
         print("=" * 65)

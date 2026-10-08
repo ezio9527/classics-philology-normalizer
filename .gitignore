@@ -11,6 +11,8 @@ venv/
 # Temporary directories and chunk working trees
 temp/
 chunks/
+scratch/
+dist_seo/
 *.clean.md
 *.normalized.md
 
